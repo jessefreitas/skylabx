@@ -39,8 +39,8 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.skylabx.rule=Host(`skylabx.omniforge.com.br`)"
       - "traefik.http.routers.skylabx.entrypoints=websecure"
-      - "traefik.http.routers.skylabx.tls=true"
       - "traefik.http.routers.skylabx.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.skylabx.service=skylabx"
       - "traefik.http.services.skylabx.loadbalancer.server.port=3000"
       - "traefik.docker.network=traefik-network"
     networks:
