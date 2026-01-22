@@ -1,540 +1,301 @@
-"use client";
+'use client';
 
-import { useState } from 'react';
-import PageLayout from '@/components/PageLayout';
-import MultiModalChat from '@/components/MultiModalChat';
-import {
-  BsCodeSlash,
-  BsShieldCheck,
-  BsSpeedometer2,
-  BsBarChart,
-  BsArrowRepeat,
-  BsGearWideConnected,
-  BsCheck2Circle,
-  BsExclamationTriangle,
-  BsLightbulbFill,
-  BsChevronRight
-} from 'react-icons/bs';
+import Editor from '@monaco-editor/react';
+import { useEffect, useState } from 'react';
+import { BsClock, BsCodeSlash, BsExclamationCircle, BsLightbulbFill, BsUpload, BsXCircle } from 'react-icons/bs';
+
+interface CodeIssue {
+  severity: string;
+  type: string;
+  line: number;
+  message: string;
+}
+
+interface AnalysisResult {
+  codeContent?: string;
+  quality_score: number;
+  security_score: number;
+  performance_score: number;
+  avg_score: number;
+  issues: CodeIssue[];
+  recommendations: string[];
+  language?: string;
+}
+
+interface AuditHistory {
+  id: string;
+  filename: string;
+  avgScore: number;
+  qualityScore: number;
+  securityScore: number;
+  createdAt: string;
+}
 
 export default function CodeAnalysisPage() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [code, setCode] = useState('');
+  const [filename, setFilename] = useState('script.py');
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [history, setHistory] = useState<AuditHistory[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'issues'>('overview');
 
-  // Sample code quality metrics
-  const codeMetrics = {
-    bugs: 42,
-    vulnerabilities: 7,
-    codeCoverage: 68,
-    duplications: 3.2,
-    complexity: 'Medium',
-    techDebt: '4d 2h',
-    qualityGate: 'Passed'
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch('/api/code-audits');
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(data);
+      }
+    } catch (e) {
+      console.error('Failed to load history:', e);
+    }
   };
 
-  // Top features of code analysis
-  const features = [
-    {
-      id: 'static-analysis',
-      title: 'Static Code Analysis',
-      description: 'Analyze code without execution to find bugs, vulnerabilities, and code smells early in development.',
-      icon: <BsCodeSlash className="text-blue-500" size={24} />,
-      metrics: ['156 issues resolved this month', '24% improvement in code quality'],
-      integrations: ['GitHub', 'GitLab', 'BitBucket', 'Azure DevOps']
-    },
-    {
-      id: 'security',
-      title: 'Security Analysis',
-      description: 'Identify security vulnerabilities including OWASP Top 10 and industry-specific compliance requirements.',
-      icon: <BsShieldCheck className="text-green-600" size={24} />,
-      metrics: ['7 critical vulnerabilities detected', '3 security hotspots need review'],
-      integrations: ['Snyk', 'SonarQube', 'Veracode', 'Checkmarx']
-    },
-    {
-      id: 'performance',
-      title: 'Performance Optimization',
-      description: 'Detect performance bottlenecks and resource-intensive code patterns for optimization.',
-      icon: <BsSpeedometer2 className="text-orange-500" size={24} />,
-      metrics: ['15% average response time improvement', '23 slow database queries optimized'],
-      integrations: ['New Relic', 'Datadog', 'Dynatrace', 'Lighthouse']
-    },
-    {
-      id: 'metrics',
-      title: 'Code Quality Metrics',
-      description: 'Track code quality metrics over time with historical trends and team performance insights.',
-      icon: <BsBarChart className="text-purple-600" size={24} />,
-      metrics: ['Technical debt reduced by 18%', 'Test coverage increased to 68%'],
-      integrations: ['SonarQube', 'CodeClimate', 'Codacy', 'Codecov']
-    },
-    {
-      id: 'integration',
-      title: 'CI/CD Integration',
-      description: 'Seamlessly integrate with CI/CD pipelines to enforce quality gates and prevent problematic deployments.',
-      icon: <BsGearWideConnected className="text-gray-600" size={24} />,
-      metrics: ['24 failed builds prevented', '8 minutes average for full analysis'],
-      integrations: ['Jenkins', 'GitHub Actions', 'CircleCI', 'Travis CI', 'TeamCity']
+  const analyzeCode = async () => {
+    if (!code.trim()) {
+      setError('Cole ou faça upload do código primeiro');
+      return;
     }
-  ];
 
-  // Latest analysis issues
-  const issues = [
-    { id: 1, severity: 'Critical', type: 'Security', description: 'SQL injection vulnerability in login form', file: 'src/controllers/auth.js', line: 42 },
-    { id: 2, severity: 'Major', type: 'Bug', description: 'Possible null reference exception', file: 'src/services/user.ts', line: 127 },
-    { id: 3, severity: 'Minor', type: 'Code Smell', description: 'Function has a complexity of 15, maximum allowed is 10', file: 'src/utils/parser.js', line: 85 },
-    { id: 4, severity: 'Critical', type: 'Security', description: 'Hard-coded credentials in configuration file', file: 'src/config/database.js', line: 23 },
-    { id: 5, severity: 'Major', type: 'Bug', description: 'Race condition in concurrent operations', file: 'src/services/transaction.ts', line: 94 }
-  ];
+    setLoading(true);
+    setError('');
+    setAnalysis(null);
+
+    try {
+      const response = await fetch('/api/analyze-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          filename,
+          language: filename.split('.').pop()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro na análise');
+      }
+
+      const result = await response.json();
+      setAnalysis(result);
+      fetchHistory(); // Refresh history
+      setActiveTab('overview');
+    } catch (err: any) {
+      console.error('Analysis error:', err);
+      setError(err.message || 'Erro ao analisar código');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-emerald-400';
+    if (score >= 60) return 'text-amber-400';
+    return 'text-rose-400';
+  };
+
+  const getSeverityColor = (severity: string) => {
+    const s = severity.toLowerCase();
+    if (s === 'critical') return 'text-red-500 bg-red-500/10 border-red-500/20';
+    if (s === 'major') return 'text-orange-500 bg-orange-500/10 border-orange-500/20';
+    return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
+  };
 
   return (
-    <PageLayout
-      title="Code Analysis"
-      description="Analyze your code for quality, security, and performance"
-      agentType="code-analysis"
-    >
-      {/* Tabs Navigation */}
-      <div className="flex overflow-x-auto mb-6 border-b">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2 mr-2 font-medium ${
-            activeTab === 'overview'
-              ? 'text-msBlue-600 border-b-2 border-msBlue-600'
-              : 'text-msGray-600 hover:text-msBlue-600'
-          }`}
-        >
-          Overview
-        </button>
-        <button
-          onClick={() => setActiveTab('issues')}
-          className={`px-4 py-2 mr-2 font-medium ${
-            activeTab === 'issues'
-              ? 'text-msBlue-600 border-b-2 border-msBlue-600'
-              : 'text-msGray-600 hover:text-msBlue-600'
-          }`}
-        >
-          Issues
-        </button>
-        <button
-          onClick={() => setActiveTab('features')}
-          className={`px-4 py-2 mr-2 font-medium ${
-            activeTab === 'features'
-              ? 'text-msBlue-600 border-b-2 border-msBlue-600'
-              : 'text-msGray-600 hover:text-msBlue-600'
-          }`}
-        >
-          Features
-        </button>
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'settings'
-              ? 'text-msBlue-600 border-b-2 border-msBlue-600'
-              : 'text-msGray-600 hover:text-msBlue-600'
-          }`}
-        >
-          Settings
-        </button>
-      </div>
+    <div className="min-h-screen bg-mega-main p-4 md:p-8 pt-40 text-mega-text-primary bg-dot-white/[0.2] relative">
+      <div className="absolute pointer-events-none inset-0 flex items-center justify-center bg-mega-main [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]"></div>
 
-      {/* Overview Tab */}
-      {activeTab === 'overview' && (
-        <div>
-          {/* Summary cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="card p-4">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium text-msGray-600">Code Quality</h3>
-                <span className="text-green-500">
-                  <BsCheck2Circle size={20} />
-                </span>
-              </div>
-              <div className="flex items-end">
-                <span className="text-2xl font-bold">A+</span>
-                <span className="ml-2 text-xs text-green-600">↑ 12% from last scan</span>
-              </div>
-            </div>
 
-            <div className="card p-4">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium text-msGray-600">Issues</h3>
-                <span className="text-yellow-500">
-                  <BsExclamationTriangle size={20} />
-                </span>
-              </div>
-              <div className="flex items-end">
-                <span className="text-2xl font-bold">{codeMetrics.bugs + codeMetrics.vulnerabilities}</span>
-                <span className="ml-2 text-xs text-red-600">↑ 3 new issues</span>
-              </div>
-            </div>
+      {/* Navbar is provided by layout.tsx */}
 
-            <div className="card p-4">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium text-msGray-600">Test Coverage</h3>
-                <span className="text-blue-500">
-                  <BsBarChart size={20} />
-                </span>
-              </div>
-              <div className="flex items-end">
-                <span className="text-2xl font-bold">{codeMetrics.codeCoverage}%</span>
-                <span className="ml-2 text-xs text-green-600">↑ 5% from last scan</span>
-              </div>
-            </div>
 
-            <div className="card p-4">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium text-msGray-600">Technical Debt</h3>
-                <span className="text-purple-500">
-                  <BsLightbulbFill size={20} />
-                </span>
-              </div>
-              <div className="flex items-end">
-                <span className="text-2xl font-bold">{codeMetrics.techDebt}</span>
-                <span className="ml-2 text-xs text-green-600">↓ 8% from last scan</span>
-              </div>
-            </div>
+      <div className="max-w-7xl mx-auto relative z-10">
+        {/* Header */}
+        <div className="mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent mb-2 mt-8">
+              Code Quality AI
+            </h1>
+            <p className="text-slate-400 max-w-md">
+              Auditoria profunda de código: Qualidade, Segurança e Performance.
+            </p>
           </div>
 
-          {/* Code Metrics */}
-          <div className="card p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Code Quality Metrics</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <h3 className="text-sm text-msGray-600 mb-2">Reliability</h3>
-                <div className="flex flex-col space-y-2">
-                  <div className="flex justify-between">
-                    <span>Bugs</span>
-                    <span className="font-medium">{codeMetrics.bugs}</span>
-                  </div>
-                  <div className="w-full bg-msGray-200 rounded-full h-2">
-                    <div className="bg-red-500 h-2 rounded-full" style={{ width: `${Math.min(codeMetrics.bugs / 100 * 100, 100)}%` }}></div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm text-msGray-600 mb-2">Security</h3>
-                <div className="flex flex-col space-y-2">
-                  <div className="flex justify-between">
-                    <span>Vulnerabilities</span>
-                    <span className="font-medium">{codeMetrics.vulnerabilities}</span>
-                  </div>
-                  <div className="w-full bg-msGray-200 rounded-full h-2">
-                    <div className="bg-orange-500 h-2 rounded-full" style={{ width: `${Math.min(codeMetrics.vulnerabilities / 20 * 100, 100)}%` }}></div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm text-msGray-600 mb-2">Maintainability</h3>
-                <div className="flex flex-col space-y-2">
-                  <div className="flex justify-between">
-                    <span>Code Smells</span>
-                    <span className="font-medium">124</span>
-                  </div>
-                  <div className="w-full bg-msGray-200 rounded-full h-2">
-                    <div className="bg-yellow-500 h-2 rounded-full" style={{ width: '62%' }}></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-msGray-200 grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <h3 className="text-sm text-msGray-600 mb-2">Test Coverage</h3>
-                <div className="flex flex-col space-y-2">
-                  <div className="flex justify-between">
-                    <span>Coverage</span>
-                    <span className="font-medium">{codeMetrics.codeCoverage}%</span>
-                  </div>
-                  <div className="w-full bg-msGray-200 rounded-full h-2">
-                    <div className="bg-green-500 h-2 rounded-full" style={{ width: `${codeMetrics.codeCoverage}%` }}></div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm text-msGray-600 mb-2">Duplication</h3>
-                <div className="flex flex-col space-y-2">
-                  <div className="flex justify-between">
-                    <span>Duplicated Lines</span>
-                    <span className="font-medium">{codeMetrics.duplications}%</span>
-                  </div>
-                  <div className="w-full bg-msGray-200 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${codeMetrics.duplications * 10}%` }}></div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm text-msGray-600 mb-2">Complexity</h3>
-                <div className="flex flex-col space-y-2">
-                  <div className="flex justify-between">
-                    <span>Cyclomatic Complexity</span>
-                    <span className="font-medium">{codeMetrics.complexity}</span>
-                  </div>
-                  <div className="w-full bg-msGray-200 rounded-full h-2">
-                    <div className="bg-purple-500 h-2 rounded-full" style={{ width: '50%' }}></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <button className="flex items-center text-msBlue-600 text-sm font-medium">
-                View detailed report <BsChevronRight className="ml-1" />
-              </button>
-            </div>
-          </div>
-
-          {/* Recent Issues */}
-          <div className="card p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Recent Issues</h2>
-              <button className="flex items-center text-sm bg-msGray-100 hover:bg-msGray-200 rounded-md px-3 py-1">
-                <BsArrowRepeat className="mr-1" /> Refresh
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-msGray-600 border-b border-msGray-200">
-                    <th className="pb-2 font-medium">Severity</th>
-                    <th className="pb-2 font-medium">Type</th>
-                    <th className="pb-2 font-medium">Description</th>
-                    <th className="pb-2 font-medium">File</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {issues.map(issue => (
-                    <tr key={issue.id} className="border-b border-msGray-200">
-                      <td className="py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          issue.severity === 'Critical' ? 'bg-red-100 text-red-800' :
-                          issue.severity === 'Major' ? 'bg-orange-100 text-orange-800' : 
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {issue.severity}
-                        </span>
-                      </td>
-                      <td className="py-3">
-                        <span className={`text-sm ${
-                          issue.type === 'Security' ? 'text-red-600' :
-                          issue.type === 'Bug' ? 'text-orange-600' : 
-                          'text-blue-600'
-                        }`}>
-                          {issue.type}
-                        </span>
-                      </td>
-                      <td className="py-3">
-                        <span className="text-sm">{issue.description}</span>
-                      </td>
-                      <td className="py-3">
-                        <span className="text-sm text-msGray-600">{issue.file}:{issue.line}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button className="text-msBlue-600 text-sm font-medium">View all issues</button>
-            </div>
-          </div>
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="p-3 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex items-center gap-2"
+          >
+            <BsClock size={18} className="text-white/80" />
+            <span className="text-sm font-semibold">Histórico</span>
+          </button>
         </div>
-      )}
 
-      {/* Features Tab */}
-      {activeTab === 'features' && (
-        <div className="space-y-6">
-          {features.map(feature => (
-            <div key={feature.id} className="card p-6">
-              <div className="flex items-start">
-                <div className="mr-4">{feature.icon}</div>
-                <div className="flex-1">
-                  <h2 className="text-xl font-semibold mb-2">{feature.title}</h2>
-                  <p className="text-msGray-600 mb-4">{feature.description}</p>
-                  
-                  <div className="mb-4">
-                    <h3 className="font-medium mb-2">Key Metrics</h3>
-                    <ul className="list-disc list-inside text-sm space-y-1">
-                      {feature.metrics.map((metric, idx) => (
-                        <li key={idx}>{metric}</li>
-                      ))}
-                    </ul>
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-250px)]">
+
+          {/* Left: Input */}
+          <div className="lg:col-span-5 bg-mega-surface/50 border border-white/10 rounded-3xl backdrop-blur-md shadow-2xl flex flex-col overflow-hidden">
+            <div className="bg-black/40 p-3 border-b border-white/5 flex justify-between items-center text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-purple-400"><BsCodeSlash /></span>
+                <input
+                  type="text"
+                  value={filename}
+                  onChange={(e) => setFilename(e.target.value)}
+                  className="bg-transparent border-none text-neutral-300 focus:outline-none w-32 font-mono"
+                />
+              </div>
+              <div className="flex gap-2">
+                <label className="cursor-pointer hover:text-white text-neutral-400 flex items-center gap-1 transition-colors">
+                  <BsUpload size={14} /> Upload
+                  <input type="file" className="hidden" onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setFilename(file.name);
+                      const reader = new FileReader();
+                      reader.onload = (e) => setCode(e.target?.result as string);
+                      reader.readAsText(file);
+                    }
+                  }} />
+                </label>
+              </div>
+            </div>
+            <div className="flex-1 min-h-[400px]">
+              <Editor
+                height="100%"
+                defaultLanguage="python"
+                theme="vs-dark"
+                value={code}
+                onChange={(val) => setCode(val || '')}
+                options={{ minimap: { enabled: false }, fontSize: 13, automaticLayout: true }}
+              />
+            </div>
+            <div className="p-4 border-t border-white/5 bg-black/20">
+              <button
+                onClick={analyzeCode}
+                disabled={loading || !code}
+                className="w-full bg-white text-black hover:bg-white/90 font-bold py-3 px-6 rounded-xl transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Analisando via IA...' : '🚀 Analisar Código'}
+              </button>
+            </div>
+          </div>
+
+          {/* Right: Results */}
+          <div className="lg:col-span-7 bg-mega-surface/30 border border-white/5 rounded-3xl p-6 backdrop-blur-md relative flex flex-col overflow-hidden">
+
+            {analysis ? (
+              <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-2">
+                {/* Score Cards */}
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="p-4 bg-black/20 rounded-2xl border border-white/5 text-center">
+                    <div className={`text-4xl font-bold ${getScoreColor(analysis.quality_score)}`}>{analysis.quality_score}</div>
+                    <div className="text-xs text-neutral-500 uppercase mt-1">Qualidade</div>
                   </div>
-                  
-                  <div>
-                    <h3 className="font-medium mb-2">Integrations</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {feature.integrations.map((integration, idx) => (
-                        <span key={idx} className="bg-msGray-100 text-msGray-700 text-xs rounded-full px-3 py-1">
-                          {integration}
-                        </span>
-                      ))}
+                  <div className="p-4 bg-black/20 rounded-2xl border border-white/5 text-center">
+                    <div className={`text-4xl font-bold ${getScoreColor(analysis.security_score)}`}>{analysis.security_score}</div>
+                    <div className="text-xs text-neutral-500 uppercase mt-1">Segurança</div>
+                  </div>
+                  <div className="p-4 bg-black/20 rounded-2xl border border-white/5 text-center">
+                    <div className={`text-4xl font-bold ${getScoreColor(analysis.performance_score)}`}>{analysis.performance_score}</div>
+                    <div className="text-xs text-neutral-500 uppercase mt-1">Perform.</div>
+                  </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex gap-4 border-b border-white/10 mb-4 pb-2">
+                  <button onClick={() => setActiveTab('overview')} className={`text-sm font-medium pb-2 ${activeTab === 'overview' ? 'text-white border-b-2 border-purple-500' : 'text-neutral-500'}`}>Visão Geral</button>
+                  <button onClick={() => setActiveTab('issues')} className={`text-sm font-medium pb-2 ${activeTab === 'issues' ? 'text-white border-b-2 border-purple-500' : 'text-neutral-500'}`}>Problemas ({analysis.issues.length})</button>
+                </div>
+
+                {activeTab === 'overview' && (
+                  <div className="space-y-4">
+                    <div className="bg-emerald-500/5 border border-emerald-500/10 p-4 rounded-xl">
+                      <h3 className="text-emerald-400 font-medium mb-2 flex items-center gap-2"><BsLightbulbFill /> Recomendações Principais</h3>
+                      <ul className="space-y-2">
+                        {(analysis.recommendations || []).map((rec, i) => (
+                          <li key={i} className="text-neutral-300 text-sm flex gap-2">
+                            <span className="text-emerald-500">•</span> {rec}
+                          </li>
+                        ))}
+                        {(!analysis.recommendations || analysis.recommendations.length === 0) && (
+                          <li className="text-neutral-400 text-sm italic">Nenhuma recomendação específica.</li>
+                        )}
+                      </ul>
                     </div>
                   </div>
+                )}
+
+                {activeTab === 'issues' && (
+                  <div className="space-y-3">
+                    {analysis.issues.map((issue, i) => (
+                      <div key={i} className={`p-3 rounded-lg border flex gap-3 ${getSeverityColor(issue.severity || 'minor')}`}>
+                        <div className="mt-1"><BsExclamationCircle /></div>
+                        <div>
+                          <div className="flex items-center gap-2 text-sm font-bold opacity-90">
+                            <span className="uppercase text-xs tracking-wider">{issue.severity}</span>
+                            <span className="w-1 h-1 bg-current rounded-full"></span>
+                            <span>{issue.type}</span>
+                            {issue.line > 0 && <span className="text-xs opacity-70 ml-auto font-mono">Linha {issue.line}</span>}
+                          </div>
+                          <p className="text-sm mt-1 opacity-80">{issue.message}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-neutral-600">
+                <div className="w-20 h-20 mb-4 rounded-full bg-white/5 flex items-center justify-center animate-pulse">
+                  <BsCodeSlash size={32} className="opacity-50" />
+                </div>
+                <p className="text-lg font-medium">Aguardando Código</p>
+                <p className="text-sm">Selecione um arquivo ou cole ao lado.</p>
+              </div>
+            )}
+
+            {error && (
+              <div className="mt-4 p-3 bg-red-900/50 border border-red-500/50 rounded-lg text-white text-sm flex gap-2 items-center animate-in slide-in-from-bottom-2">
+                <BsXCircle /> {error}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+
+      {/* History Sidebar */}
+      {showHistory && (
+        <div className="fixed right-0 top-0 h-screen w-80 bg-mega-surface/95 backdrop-blur-xl border-l border-white/10 p-6 overflow-y-auto z-50 shadow-2xl">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-white">Histórico</h2>
+            <button onClick={() => setShowHistory(false)} className="text-neutral-400 hover:text-white">✕</button>
+          </div>
+          <div className="space-y-3">
+            {history.map(item => (
+              <div key={item.id} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl cursor-pointer transition-colors border border-white/5">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-mono text-xs text-blue-400 truncate max-w-[150px]">{item.filename}</span>
+                  <span className={`text-sm font-bold ${getScoreColor(item.avgScore)}`}>{item.avgScore}</span>
+                </div>
+                <div className="flex justify-between text-xs text-neutral-500">
+                  <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                  <span>Qlty: {item.qualityScore}</span>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Issues Tab */}
-      {activeTab === 'issues' && (
-        <div className="card p-6">
-          <div className="flex flex-wrap justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold">Code Issues</h2>
-            <div className="flex space-x-2">
-              <select className="px-3 py-1.5 border border-msGray-300 rounded bg-white text-sm">
-                <option>All Severities</option>
-                <option>Critical</option>
-                <option>Major</option>
-                <option>Minor</option>
-              </select>
-              <select className="px-3 py-1.5 border border-msGray-300 rounded bg-white text-sm">
-                <option>All Types</option>
-                <option>Security</option>
-                <option>Bug</option>
-                <option>Code Smell</option>
-              </select>
-              <button className="flex items-center bg-msBlue-600 hover:bg-msBlue-700 text-white text-sm rounded px-3 py-1.5">
-                <BsArrowRepeat className="mr-1" /> Refresh
-              </button>
-            </div>
-          </div>
-          
-          {/* Issues table - expanded version */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left bg-msGray-50 text-msGray-600 border-y border-msGray-200">
-                  <th className="px-4 py-3 font-medium">Severity</th>
-                  <th className="px-4 py-3 font-medium">Type</th>
-                  <th className="px-4 py-3 font-medium">Description</th>
-                  <th className="px-4 py-3 font-medium">File</th>
-                  <th className="px-4 py-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {issues.map(issue => (
-                  <tr key={issue.id} className="border-b border-msGray-200 hover:bg-msGray-50">
-                    <td className="px-4 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        issue.severity === 'Critical' ? 'bg-red-100 text-red-800' :
-                        issue.severity === 'Major' ? 'bg-orange-100 text-orange-800' : 
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {issue.severity}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center">
-                        {issue.type === 'Security' && <BsShieldCheck className="text-red-500 mr-1.5" />}
-                        {issue.type === 'Bug' && <BsExclamationTriangle className="text-orange-500 mr-1.5" />}
-                        {issue.type === 'Code Smell' && <BsLightbulbFill className="text-blue-500 mr-1.5" />}
-                        <span>{issue.type}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className="text-sm">{issue.description}</span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">{issue.file}</span>
-                        <span className="text-xs text-msGray-500">Line {issue.line}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex space-x-2">
-                        <button className="text-msBlue-600 hover:text-msBlue-800 text-sm font-medium">Fix</button>
-                        <button className="text-msGray-600 hover:text-msGray-800 text-sm">Ignore</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          <div className="mt-6 flex justify-between items-center">
-            <div className="text-sm text-msGray-600">
-              Showing 5 of 48 issues
-            </div>
-            <div className="flex space-x-2">
-              <button className="px-3 py-1 border border-msGray-300 rounded text-sm" disabled>Previous</button>
-              <button className="px-3 py-1 bg-msBlue-600 text-white rounded text-sm">1</button>
-              <button className="px-3 py-1 border border-msGray-300 rounded text-sm">2</button>
-              <button className="px-3 py-1 border border-msGray-300 rounded text-sm">3</button>
-              <button className="px-3 py-1 border border-msGray-300 rounded text-sm">Next</button>
-            </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Settings Tab */}
-      {activeTab === 'settings' && (
-        <div className="card p-6">
-          <h2 className="text-xl font-semibold mb-6">Code Analysis Settings</h2>
-          
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-4">Repository Configuration</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Repository URL</label>
-                <input type="text" className="w-full px-3 py-2 border border-msGray-300 rounded" placeholder="https://github.com/username/repo" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Branch</label>
-                <input type="text" className="w-full px-3 py-2 border border-msGray-300 rounded" placeholder="main" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-4">Analysis Configuration</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 border border-msGray-200 rounded">
-                <div>
-                  <h4 className="font-medium">Run analysis on pull requests</h4>
-                  <p className="text-sm text-msGray-600">Analyze code changes when a pull request is created or updated</p>
-                </div>
-                <label className="switch">
-                  <input type="checkbox" checked />
-                  <span className="slider round"></span>
-                </label>
-              </div>
-              
-              <div className="flex items-center justify-between p-4 border border-msGray-200 rounded">
-                <div>
-                  <h4 className="font-medium">Enforce quality gates</h4>
-                  <p className="text-sm text-msGray-600">Block merging of code that doesn't pass quality checks</p>
-                </div>
-                <label className="switch">
-                  <input type="checkbox" checked />
-                  <span className="slider round"></span>
-                </label>
-              </div>
-              
-              <div className="flex items-center justify-between p-4 border border-msGray-200 rounded">
-                <div>
-                  <h4 className="font-medium">Security scanning</h4>
-                  <p className="text-sm text-msGray-600">Enable SAST and dependency vulnerability scanning</p>
-                </div>
-                <label className="switch">
-                  <input type="checkbox" checked />
-                  <span className="slider round"></span>
-                </label>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex justify-end space-x-3">
-            <button className="px-4 py-2 bg-msGray-100 hover:bg-msGray-200 rounded text-sm">Cancel</button>
-            <button className="px-4 py-2 bg-msBlue-600 hover:bg-msBlue-700 text-white rounded text-sm">Save Settings</button>
-          </div>
-        </div>
-      )}
-      
-      {/* Multi-Modal AI Chat Widget */}
-      <MultiModalChat />
-    </PageLayout>
+    </div>
   );
 }

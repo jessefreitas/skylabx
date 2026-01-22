@@ -18,7 +18,7 @@ import {
 
 export default function LoadTestingPage() {
   const [testScenarios, setTestScenarios] = useState([{ name: 'Basic Scenario', load: 50 }]);
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Add KPIs for load testing 

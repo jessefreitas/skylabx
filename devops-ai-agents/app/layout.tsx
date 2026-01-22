@@ -1,10 +1,10 @@
+import { VortexNavbar } from "@/components/navigation/vortex-navbar";
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
 
 export const metadata: Metadata = {
-  title: "DevOps AI Agents",
-  description: "AI-powered DevOps operation assistants",
+  title: "SkyLabX - DevOps Intelligence",
+  description: "Plataforma de orquestração DevOps com IA avançada powered by OmniForge",
 };
 
 export default function RootLayout({
@@ -13,12 +13,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body>
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 p-8">{children}</main>
-        </div>
+    <html lang="pt-BR" className="dark">
+      <body className="bg-[#0a0a0a] text-white overflow-x-hidden antialiased">
+        <VortexNavbar />
+        {children}
       </body>
     </html>
   );
