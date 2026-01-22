@@ -117,7 +117,7 @@ The platform offers a suite of AI-powered DevOps tools for modern software devel
 ### 🌟 Key Highlights
 
 - ✅ **AI-Powered Automation** - Intelligent agents handle repetitive DevOps tasks
-- ✅ **Multi-Cloud Support** - Works seamlessly across AWS, Azure, GCP, and more
+- ✅ **VPS Native Support** - Optimized for high-performance VPS environments
 - ✅ **Real-Time Monitoring** - Continuous monitoring with instant alerts
 - ✅ **Security First** - Built-in security scanning and compliance checks
 - ✅ **User-Friendly Interface** - Intuitive UI built with modern web technologies
@@ -660,7 +660,7 @@ module.exports = {
 <details>
 <summary><b>Q: What cloud providers are supported?</b></summary>
 <br>
-Currently, the platform is designed to work with AWS, Azure, GCP, and other major cloud providers. Specific integrations are being developed.
+Currently, the platform is optimized for VPS environments and major cloud providers.
 </details>
 
 <details>
@@ -761,7 +761,7 @@ This platform is primarily designed as a showcase and starting point for DevOps 
 <details>
 <summary><b>Which cloud providers are supported?</b></summary>
 <br>
-The platform is designed to be cloud-agnostic. The UI supports managing resources across AWS, Azure, Google Cloud, and other major cloud providers. Backend integrations would need to be implemented based on your specific requirements.
+The platform is designed to be environment-agnostic. The UI supports managing resources across VPS and major cloud providers.
 </details>
 
 <details>
