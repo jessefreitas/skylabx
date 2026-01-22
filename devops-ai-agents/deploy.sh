@@ -6,7 +6,7 @@ set -e  # Exit on error
 echo "🚀 Starting deployment for DevOps AI Agents..."
 
 # Navigate to project directory
-PROJECT_DIR="/root/devops-ai-agents"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR" || { echo "❌ Failed to navigate to $PROJECT_DIR"; exit 1; }
 
 # Pull latest changes from git
